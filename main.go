@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 
-	// middlewares "EMS/middlewares"
-	// routes "EMS/routes"
+	middlewares "EMS/middlewares"
+	routes "EMS/routes"
 
 	"github.com/joho/godotenv"
 )
@@ -23,15 +23,15 @@ func main() {
 	mux := http.NewServeMux()
 
 	// Register the routes
-	// routes.EmployeeRoutes(mux)
+	routes.EmployeeRoutes(mux)
 
 	// Add middleware
-	// handler := middlewares.Logging(mux)
+	handler := middlewares.Logging(mux)
 
 	// Set up the server configuration
 	server := &http.Server{
 		Addr:    ":" + port,
-		Handler: mux,
+		Handler: handler,
 	}
 
 	log.Println("Server starting on http://localhost:5050")
