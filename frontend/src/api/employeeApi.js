@@ -29,7 +29,7 @@ export async function createEmployee(data) {
 
 export async function updateEmployee(empId, data) {
   const res = await fetch(`${BASE_URL}/employee/${empId}`, {
-    method: 'PUT',
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
