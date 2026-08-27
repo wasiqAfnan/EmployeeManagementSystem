@@ -36,7 +36,8 @@ func main() {
 	routes.EmployeeRoutes(mux, employeeHandler)
 
 	// Add logging middleware
-	muxWithLogging := middleware.Logging(mux)
+	muxWithCORS := middleware.CORS(mux, cfg.FrontendURL)
+	muxWithLogging := middleware.Logging(muxWithCORS)
 
 	// Set up the server
 	server := &http.Server{

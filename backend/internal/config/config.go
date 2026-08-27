@@ -11,6 +11,7 @@ type Config struct {
 	Port         string
 	MongoURI     string
 	DatabaseName string
+	FrontendURL  string
 }
 
 func Load() *Config {
@@ -23,5 +24,6 @@ func Load() *Config {
 		Port:         os.Getenv("PORT"),
 		MongoURI:     os.Getenv("MONGODB_URI"),
 		DatabaseName: os.Getenv("MONGODB_DATABASE"),
+		FrontendURL:  os.Getenv("FRONTEND_URL"),
 	}
 }
