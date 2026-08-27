@@ -7,19 +7,5 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), tailwindcss()],
-
-    server: {
-      proxy: {
-        '/employees': {
-          target: env.VITE_API_URL,
-          changeOrigin: true,
-        },
-
-        '/employee': {
-          target: env.VITE_API_URL,
-          changeOrigin: true,
-        },
-      },
-    },
   }
 })

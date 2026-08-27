@@ -1,5 +1,4 @@
-const BASE_URL = '/employee';
-const BASE_URL_PLURAL = '/employees';
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 async function handleResponse(res) {
   const json = await res.json();
@@ -10,17 +9,17 @@ async function handleResponse(res) {
 }
 
 export async function getAllEmployees() {
-  const res = await fetch(BASE_URL_PLURAL);
+  const res = await fetch(`${BASE_URL}/employees`);
   return handleResponse(res);
 }
 
 export async function getEmployee(empId) {
-  const res = await fetch(`${BASE_URL}/${empId}`);
+  const res = await fetch(`${BASE_URL}/employee/${empId}`);
   return handleResponse(res);
 }
 
 export async function createEmployee(data) {
-  const res = await fetch(BASE_URL, {
+  const res = await fetch(`${BASE_URL}/employee`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -29,7 +28,7 @@ export async function createEmployee(data) {
 }
 
 export async function updateEmployee(empId, data) {
-  const res = await fetch(`${BASE_URL}/${empId}`, {
+  const res = await fetch(`${BASE_URL}/employee/${empId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -38,13 +37,13 @@ export async function updateEmployee(empId, data) {
 }
 
 export async function deleteEmployee(empId) {
-  const res = await fetch(`${BASE_URL}/${empId}`, {
+  const res = await fetch(`${BASE_URL}/employee/${empId}`, {
     method: 'DELETE',
   });
   return handleResponse(res);
 }
 
 export async function searchEmployees(query) {
-  const res = await fetch(`${BASE_URL_PLURAL}/search?q=${encodeURIComponent(query)}`);
+  const res = await fetch(`${BASE_URL}/employees/search?q=${encodeURIComponent(query)}`);
   return handleResponse(res);
 }
