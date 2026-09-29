@@ -8,7 +8,9 @@ import (
 	"EMS/internal/database"
 	"EMS/internal/handler"
 	"EMS/internal/middleware"
+	"EMS/internal/repository"
 	"EMS/internal/routes"
+	"EMS/internal/service"
 )
 
 func main() {
@@ -26,8 +28,10 @@ func main() {
 	// Get the employees collection directly
 	collection := client.Database(cfg.DatabaseName).Collection("employees")
 
-	// Create handler: pass the collection directly, no repository needed
-	employeeHandler := handler.NewEmployeeHandler(collection)
+	// Create repository, service, and handler
+	employeeRepo := repository.NewEmployeeRepository(collection)
+	employeeService := service.NewEmployeeService(employeeRepo)
+	employeeHandler := handler.NewEmployeeHandler(employeeService)
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
