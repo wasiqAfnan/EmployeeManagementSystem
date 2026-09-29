@@ -26,19 +26,6 @@ func NewEmployeeHandler(collection *mongo.Collection) *EmployeeHandler {
 	return &EmployeeHandler{collection: collection}
 }
 
-// APIResponse is the standard JSON envelope sent back on every request.
-type APIResponse struct {
-	Status  string `json:"status"`
-	Message string `json:"message"`
-	Data    any    `json:"data"`
-}
-
-// sendJSON is a helper fucntion that encodes the response.
-func sendJSON(w http.ResponseWriter, statusCode int, resp APIResponse) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(resp)
-}
 
 // GET /employees
 func (h *EmployeeHandler) GetEmployees(w http.ResponseWriter, r *http.Request) {
@@ -48,7 +35,7 @@ func (h *EmployeeHandler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	// Fetch all documents from the collection
 	result, err := h.collection.Find(ctx, bson.M{})
 	if err != nil {
-		sendJSON(w, http.StatusInternalServerError, APIResponse{
+		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
 			Message: "Failed to fetch employees: " + err.Error(),
 			Data:    nil,
@@ -60,7 +47,7 @@ func (h *EmployeeHandler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 	// Decode the cursor results into a slice
 	var employees []model.Employee
 	if err = result.All(ctx, &employees); err != nil {
-		sendJSON(w, http.StatusInternalServerError, APIResponse{
+		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
 			Message: "Failed to decode employees: " + err.Error(),
 			Data:    nil,
@@ -73,7 +60,7 @@ func (h *EmployeeHandler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 		employees = []model.Employee{}
 	}
 
-	sendJSON(w, http.StatusOK, APIResponse{
+	utils.SendJSON(w, http.StatusOK, utils.APIResponse{
 		Status:  "success",
 		Message: "Employee records fetched successfully",
 		Data:    employees,
@@ -92,14 +79,14 @@ func (h *EmployeeHandler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 	err := h.collection.FindOne(ctx, bson.M{"empId": empId}).Decode(&employee)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			sendJSON(w, http.StatusNotFound, APIResponse{
+			utils.SendJSON(w, http.StatusNotFound, utils.APIResponse{
 				Status:  "error",
 				Message: "Employee not found",
 				Data:    nil,
 			})
 			return
 		}
-		sendJSON(w, http.StatusInternalServerError, APIResponse{
+		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
 			Message: "Failed to fetch employee: " + err.Error(),
 			Data:    nil,
@@ -107,7 +94,7 @@ func (h *EmployeeHandler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sendJSON(w, http.StatusOK, APIResponse{
+	utils.SendJSON(w, http.StatusOK, utils.APIResponse{
 		Status:  "success",
 		Message: "Employee record fetched successfully",
 		Data:    employee,
@@ -119,7 +106,7 @@ func (h *EmployeeHandler) CreateEmployee(w http.ResponseWriter, r *http.Request)
 	// Parse the JSON body
 	var emp model.Employee
 	if err := json.NewDecoder(r.Body).Decode(&emp); err != nil {
-		sendJSON(w, http.StatusBadRequest, APIResponse{
+		utils.SendJSON(w, http.StatusBadRequest, utils.APIResponse{
 			Status:  "error",
 			Message: "Invalid JSON body",
 			Data:    nil,
@@ -129,7 +116,7 @@ func (h *EmployeeHandler) CreateEmployee(w http.ResponseWriter, r *http.Request)
 
 	// Validate required fields
 	if err := utils.ValidateEmployee(emp); err != nil {
-		sendJSON(w, http.StatusBadRequest, APIResponse{
+		utils.SendJSON(w, http.StatusBadRequest, utils.APIResponse{
 			Status:  "error",
 			Message: err.Error(),
 			Data:    nil,
@@ -149,7 +136,7 @@ func (h *EmployeeHandler) CreateEmployee(w http.ResponseWriter, r *http.Request)
 	).Decode(&existingEmployee)
 
 	if err == nil {
-		sendJSON(w, http.StatusBadRequest, APIResponse{
+		utils.SendJSON(w, http.StatusBadRequest, utils.APIResponse{
 			Status:  "error",
 			Message: "empId already exists",
 			Data:    nil,
@@ -161,7 +148,7 @@ func (h *EmployeeHandler) CreateEmployee(w http.ResponseWriter, r *http.Request)
 	var result *mongo.InsertOneResult
 	result, err = h.collection.InsertOne(ctx, &emp)
 	if err != nil {
-		sendJSON(w, http.StatusInternalServerError, APIResponse{
+		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
 			Message: "Failed to create employee: " + err.Error(),
 			Data:    nil,
@@ -171,7 +158,7 @@ func (h *EmployeeHandler) CreateEmployee(w http.ResponseWriter, r *http.Request)
 
 	emp.ID = result.InsertedID.(bson.ObjectID)
 	// Send back the created record
-	sendJSON(w, http.StatusCreated, APIResponse{
+	utils.SendJSON(w, http.StatusCreated, utils.APIResponse{
 		Status:  "success",
 		Message: "Employee record created successfully",
 		Data:    emp,
@@ -185,7 +172,7 @@ func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request)
 	// Parse the JSON body
 	var emp model.Employee
 	if err := json.NewDecoder(r.Body).Decode(&emp); err != nil {
-		sendJSON(w, http.StatusBadRequest, APIResponse{
+		utils.SendJSON(w, http.StatusBadRequest, utils.APIResponse{
 			Status:  "error",
 			Message: "Invalid JSON body",
 			Data:    nil,
@@ -195,7 +182,7 @@ func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request)
 
 	// Validate required fields
 	if err := utils.ValidateEmployee(emp); err != nil {
-		sendJSON(w, http.StatusBadRequest, APIResponse{
+		utils.SendJSON(w, http.StatusBadRequest, utils.APIResponse{
 			Status:  "error",
 			Message: err.Error(),
 			Data:    nil,
@@ -229,7 +216,7 @@ func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request)
 
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			sendJSON(w, http.StatusNotFound, APIResponse{
+			utils.SendJSON(w, http.StatusNotFound, utils.APIResponse{
 				Status:  "error",
 				Message: "Employee not found",
 				Data:    nil,
@@ -237,7 +224,7 @@ func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		sendJSON(w, http.StatusInternalServerError, APIResponse{
+		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
 			Message: "Failed to update employee: " + err.Error(),
 			Data:    nil,
@@ -245,7 +232,7 @@ func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	sendJSON(w, http.StatusOK, APIResponse{
+	utils.SendJSON(w, http.StatusOK, utils.APIResponse{
 		Status:  "success",
 		Message: "Employee record updated successfully",
 		Data:    updatedEmp,
@@ -269,7 +256,7 @@ func (h *EmployeeHandler) DeleteEmployee(w http.ResponseWriter, r *http.Request)
 
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
-			sendJSON(w, http.StatusNotFound, APIResponse{
+			utils.SendJSON(w, http.StatusNotFound, utils.APIResponse{
 				Status:  "error",
 				Message: "Employee not found",
 				Data:    nil,
@@ -277,7 +264,7 @@ func (h *EmployeeHandler) DeleteEmployee(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		sendJSON(w, http.StatusInternalServerError, APIResponse{
+		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
 			Message: "Failed to delete employee: " + err.Error(),
 			Data:    nil,
@@ -285,7 +272,7 @@ func (h *EmployeeHandler) DeleteEmployee(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	sendJSON(w, http.StatusOK, APIResponse{
+	utils.SendJSON(w, http.StatusOK, utils.APIResponse{
 		Status:  "success",
 		Message: "Employee record deleted successfully",
 		Data:    nil,
@@ -300,7 +287,7 @@ func (h *EmployeeHandler) SearchEmployees(w http.ResponseWriter, r *http.Request
 	search := strings.TrimSpace(r.URL.Query().Get("q"))
 
 	if search == "" {
-		sendJSON(w, http.StatusBadRequest, APIResponse{
+		utils.SendJSON(w, http.StatusBadRequest, utils.APIResponse{
 			Status:  "error",
 			Message: "Search query is required",
 			Data:    nil,
@@ -334,7 +321,7 @@ func (h *EmployeeHandler) SearchEmployees(w http.ResponseWriter, r *http.Request
 
 	cursor, err := h.collection.Find(ctx, filter)
 	if err != nil {
-		sendJSON(w, http.StatusInternalServerError, APIResponse{
+		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
 			Message: "Failed to search employees: " + err.Error(),
 			Data:    nil,
@@ -344,7 +331,7 @@ func (h *EmployeeHandler) SearchEmployees(w http.ResponseWriter, r *http.Request
 	defer cursor.Close(ctx)
 
 	if err := cursor.All(ctx, &employees); err != nil {
-		sendJSON(w, http.StatusInternalServerError, APIResponse{
+		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
 			Message: "Failed to decode employees: " + err.Error(),
 			Data:    nil,
@@ -356,7 +343,7 @@ func (h *EmployeeHandler) SearchEmployees(w http.ResponseWriter, r *http.Request
 		employees = []model.Employee{}
 	}
 
-	sendJSON(w, http.StatusOK, APIResponse{
+	utils.SendJSON(w, http.StatusOK, utils.APIResponse{
 		Status:  "success",
 		Message: "Employee search completed successfully",
 		Data:    employees,
