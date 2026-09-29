@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"EMS/internal/cognito"
 	"EMS/internal/config"
 	"EMS/internal/database"
 	"EMS/internal/handler"
@@ -28,10 +29,13 @@ func main() {
 	// Get the employees collection directly
 	collection := client.Database(cfg.DatabaseName).Collection("employees")
 
-	// Create repository, service, and handler
+	// Create repository, service, and handler for Employee
 	employeeRepo := repository.NewEmployeeRepository(collection)
 	employeeService := service.NewEmployeeService(employeeRepo)
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
+
+	// Get the users collection
+	userCollection := client.Database(cfg.DatabaseName).Collection("users")
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
@@ -39,14 +43,37 @@ func main() {
 	// Register the routes
 	routes.EmployeeRoutes(mux, employeeHandler)
 
-	// Add logging middleware
-	muxWithCORS := middleware.CORS(mux, cfg.FrontendURL)
-	muxWithLogging := middleware.Logging(muxWithCORS)
+	// Initialize Cognito JWT Verifier
+	var jwtVerifier *cognito.JWTVerifier
+	if cfg.CognitoOpenIDConfigURL != "" && cfg.CognitoClientID != "" {
+		v, err := cognito.NewJWTVerifier(cfg)
+		if err != nil {
+			log.Fatalf("Failed to initialize JWT verifier: %v", err)
+		}
+		jwtVerifier = v
+	}
+
+	// Create repository, service, and handler for User
+	userRepo := repository.NewUserRepository(userCollection)
+	userService := service.NewUserService(userRepo)
+	userHandler := handler.NewUserHandler(userService, jwtVerifier)
+
+	// Register User routes
+	routes.UserRoutes(mux, userHandler)
+
+	// Add middlewares (Execution flow: Logging -> Auth -> CORS -> Mux)
+	// To achieve this flow, we wrap inside-out: CORS, then Auth, then Logging
+	var finalHandler http.Handler = mux
+	finalHandler = middleware.CORS(finalHandler, cfg.FrontendURL)
+	if jwtVerifier != nil {
+		finalHandler = middleware.Auth(jwtVerifier)(finalHandler)
+	}
+	finalHandler = middleware.Logging(finalHandler)
 
 	// Set up the server
 	server := &http.Server{
 		Addr:    ":" + cfg.Port,
-		Handler: muxWithLogging,
+		Handler: finalHandler,
 	}
 
 	log.Printf("Server starting on http://localhost:%s", cfg.Port)
