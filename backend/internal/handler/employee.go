@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"EMS/internal/middleware"
 	"EMS/internal/model"
 	"EMS/internal/service"
 	"EMS/internal/utils"
@@ -26,10 +27,12 @@ func NewEmployeeHandler(service *service.EmployeeService) *EmployeeHandler {
 
 // GET /employees
 func (h *EmployeeHandler) GetEmployees(w http.ResponseWriter, r *http.Request) {
+	sub, _ := r.Context().Value(middleware.UserContextKey).(string)
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	employees, err := h.service.GetAllEmployees(ctx)
+	employees, err := h.service.GetAllEmployees(ctx, sub)
 	if err != nil {
 		utils.SendJSON(w, http.StatusInternalServerError, utils.APIResponse{
 			Status:  "error",
@@ -49,11 +52,12 @@ func (h *EmployeeHandler) GetEmployees(w http.ResponseWriter, r *http.Request) {
 // GET /employee/{empId}
 func (h *EmployeeHandler) GetEmployee(w http.ResponseWriter, r *http.Request) {
 	empId := r.PathValue("empId")
+	sub, _ := r.Context().Value(middleware.UserContextKey).(string)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	employee, err := h.service.GetEmployeeByEmpID(ctx, empId)
+	employee, err := h.service.GetEmployeeByEmpID(ctx, sub, empId)
 	if err != nil {
 		if errors.Is(err, service.ErrEmployeeNotFound) {
 			utils.SendJSON(w, http.StatusNotFound, utils.APIResponse{
@@ -98,6 +102,11 @@ func (h *EmployeeHandler) CreateEmployee(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Extract sub from context and set CreatedBy
+	if sub, ok := r.Context().Value(middleware.UserContextKey).(string); ok {
+		emp.CreatedBy = sub
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
@@ -130,6 +139,7 @@ func (h *EmployeeHandler) CreateEmployee(w http.ResponseWriter, r *http.Request)
 // PUT /employee/{empId}
 func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request) {
 	empId := r.PathValue("empId")
+	sub, _ := r.Context().Value(middleware.UserContextKey).(string)
 
 	var emp model.Employee
 	if err := json.NewDecoder(r.Body).Decode(&emp); err != nil {
@@ -144,7 +154,7 @@ func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	updatedEmp, err := h.service.UpdateEmployee(ctx, empId, emp)
+	updatedEmp, err := h.service.UpdateEmployee(ctx, sub, empId, emp)
 	if err != nil {
 		if errors.Is(err, service.ErrEmployeeNotFound) {
 			utils.SendJSON(w, http.StatusNotFound, utils.APIResponse{
@@ -180,11 +190,12 @@ func (h *EmployeeHandler) UpdateEmployee(w http.ResponseWriter, r *http.Request)
 // DELETE /employee/{empId}
 func (h *EmployeeHandler) DeleteEmployee(w http.ResponseWriter, r *http.Request) {
 	empId := r.PathValue("empId")
+	sub, _ := r.Context().Value(middleware.UserContextKey).(string)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	_, err := h.service.DeleteEmployee(ctx, empId)
+	_, err := h.service.DeleteEmployee(ctx, sub, empId)
 	if err != nil {
 		if errors.Is(err, service.ErrEmployeeNotFound) {
 			utils.SendJSON(w, http.StatusNotFound, utils.APIResponse{
@@ -220,11 +231,12 @@ func (h *EmployeeHandler) DeleteEmployee(w http.ResponseWriter, r *http.Request)
 // GET /employees/search?q={searchQuery}
 func (h *EmployeeHandler) SearchEmployees(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
+	sub, _ := r.Context().Value(middleware.UserContextKey).(string)
 
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	employees, err := h.service.SearchEmployees(ctx, query)
+	employees, err := h.service.SearchEmployees(ctx, sub, query)
 	if err != nil {
 		if errors.Is(err, service.ErrSearchQueryRequired) {
 			utils.SendJSON(w, http.StatusBadRequest, utils.APIResponse{

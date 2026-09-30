@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"EMS/internal/model"
 
@@ -19,8 +20,9 @@ func NewEmployeeRepository(collection *mongo.Collection) *EmployeeRepository {
 }
 
 // GetAll fetches all employee records from MongoDB.
-func (r *EmployeeRepository) GetAll(ctx context.Context) ([]model.Employee, error) {
-	cursor, err := r.collection.Find(ctx, bson.M{})
+func (r *EmployeeRepository) GetAll(ctx context.Context, sub string) ([]model.Employee, error) {
+	findOptions := options.Find().SetSort(bson.D{{Key: "empId", Value: 1}})
+	cursor, err := r.collection.Find(ctx, bson.M{"createdBy": sub}, findOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -39,9 +41,9 @@ func (r *EmployeeRepository) GetAll(ctx context.Context) ([]model.Employee, erro
 }
 
 // GetByEmpID fetches a single employee record by empId from MongoDB.
-func (r *EmployeeRepository) GetByEmpID(ctx context.Context, empID string) (*model.Employee, error) {
+func (r *EmployeeRepository) GetByEmpID(ctx context.Context, sub string, empID string) (*model.Employee, error) {
 	var employee model.Employee
-	err := r.collection.FindOne(ctx, bson.M{"empId": empID}).Decode(&employee)
+	err := r.collection.FindOne(ctx, bson.M{"empId": empID, "createdBy": sub}).Decode(&employee)
 	if err != nil {
 		return nil, err
 	}
@@ -50,6 +52,10 @@ func (r *EmployeeRepository) GetByEmpID(ctx context.Context, empID string) (*mod
 
 // Create inserts a new employee record into MongoDB.
 func (r *EmployeeRepository) Create(ctx context.Context, emp *model.Employee) (*model.Employee, error) {
+	now := time.Now()
+	emp.CreatedAt = now
+	emp.UpdatedAt = now
+
 	result, err := r.collection.InsertOne(ctx, emp)
 	if err != nil {
 		return nil, err
@@ -62,14 +68,18 @@ func (r *EmployeeRepository) Create(ctx context.Context, emp *model.Employee) (*
 }
 
 // Update updates an existing employee record by empId in MongoDB.
-func (r *EmployeeRepository) Update(ctx context.Context, empID string, emp model.Employee) (*model.Employee, error) {
-	filter := bson.M{"empId": empID}
+func (r *EmployeeRepository) Update(ctx context.Context, sub string, empID string, emp model.Employee) (*model.Employee, error) {
+	filter := bson.M{"empId": empID, "createdBy": sub}
 	update := bson.M{
 		"$set": bson.M{
 			"fullName":   emp.FullName,
+			"email":      emp.Email,
 			"jobTitle":   emp.JobTitle,
 			"department": emp.Department,
 			"salary":     emp.Salary,
+		},
+		"$currentDate": bson.M{
+			"updatedAt": true,
 		},
 	}
 
@@ -89,11 +99,11 @@ func (r *EmployeeRepository) Update(ctx context.Context, empID string, emp model
 }
 
 // Delete removes an employee record by empId from MongoDB.
-func (r *EmployeeRepository) Delete(ctx context.Context, empID string) (*model.Employee, error) {
+func (r *EmployeeRepository) Delete(ctx context.Context, sub string, empID string) (*model.Employee, error) {
 	var deletedEmp model.Employee
 	err := r.collection.FindOneAndDelete(
 		ctx,
-		bson.M{"empId": empID},
+		bson.M{"empId": empID, "createdBy": sub},
 	).Decode(&deletedEmp)
 
 	if err != nil {
@@ -104,17 +114,20 @@ func (r *EmployeeRepository) Delete(ctx context.Context, empID string) (*model.E
 }
 
 // Search queries employee records matching a regex across multiple fields.
-func (r *EmployeeRepository) Search(ctx context.Context, query string) ([]model.Employee, error) {
+func (r *EmployeeRepository) Search(ctx context.Context, sub string, query string) ([]model.Employee, error) {
 	filter := bson.M{
+		"createdBy": sub,
 		"$or": []bson.M{
 			{"empId": bson.M{"$regex": query, "$options": "i"}},
 			{"fullName": bson.M{"$regex": query, "$options": "i"}},
+			{"email": bson.M{"$regex": query, "$options": "i"}},
 			{"jobTitle": bson.M{"$regex": query, "$options": "i"}},
 			{"department": bson.M{"$regex": query, "$options": "i"}},
 		},
 	}
 
-	cursor, err := r.collection.Find(ctx, filter)
+	findOptions := options.Find().SetSort(bson.D{{Key: "empId", Value: 1}})
+	cursor, err := r.collection.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}

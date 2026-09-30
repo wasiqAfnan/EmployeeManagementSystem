@@ -28,18 +28,18 @@ func NewEmployeeService(repo *repository.EmployeeRepository) *EmployeeService {
 }
 
 // GetAllEmployees handles business logic for fetching all employees.
-func (s *EmployeeService) GetAllEmployees(ctx context.Context) ([]model.Employee, error) {
-	return s.repo.GetAll(ctx)
+func (s *EmployeeService) GetAllEmployees(ctx context.Context, sub string) ([]model.Employee, error) {
+	return s.repo.GetAll(ctx, sub)
 }
 
 // GetEmployeeByEmpID handles validation and retrieval logic for a single employee by empId.
-func (s *EmployeeService) GetEmployeeByEmpID(ctx context.Context, empID string) (*model.Employee, error) {
+func (s *EmployeeService) GetEmployeeByEmpID(ctx context.Context, sub string, empID string) (*model.Employee, error) {
 	cleanID := strings.TrimSpace(empID)
 	if cleanID == "" {
 		return nil, ErrInvalidEmpID
 	}
 
-	employee, err := s.repo.GetByEmpID(ctx, cleanID)
+	employee, err := s.repo.GetByEmpID(ctx, sub, cleanID)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, ErrEmployeeNotFound
@@ -56,8 +56,8 @@ func (s *EmployeeService) CreateEmployee(ctx context.Context, emp model.Employee
 		return nil, err
 	}
 
-	// Check if employee with given empId already exists
-	_, err := s.repo.GetByEmpID(ctx, emp.EmpID)
+	// Check if employee with given empId already exists for this user
+	_, err := s.repo.GetByEmpID(ctx, emp.CreatedBy, emp.EmpID)
 	if err == nil {
 		return nil, ErrDuplicateEmpID
 	}
@@ -66,7 +66,7 @@ func (s *EmployeeService) CreateEmployee(ctx context.Context, emp model.Employee
 }
 
 // UpdateEmployee handles validation and update logic for an existing employee.
-func (s *EmployeeService) UpdateEmployee(ctx context.Context, empID string, emp model.Employee) (*model.Employee, error) {
+func (s *EmployeeService) UpdateEmployee(ctx context.Context, sub string, empID string, emp model.Employee) (*model.Employee, error) {
 	cleanID := strings.TrimSpace(empID)
 	if cleanID == "" {
 		return nil, ErrInvalidEmpID
@@ -76,7 +76,7 @@ func (s *EmployeeService) UpdateEmployee(ctx context.Context, empID string, emp 
 		return nil, err
 	}
 
-	updatedEmp, err := s.repo.Update(ctx, cleanID, emp)
+	updatedEmp, err := s.repo.Update(ctx, sub, cleanID, emp)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, ErrEmployeeNotFound
@@ -88,13 +88,13 @@ func (s *EmployeeService) UpdateEmployee(ctx context.Context, empID string, emp 
 }
 
 // DeleteEmployee handles deletion logic for an employee by empId.
-func (s *EmployeeService) DeleteEmployee(ctx context.Context, empID string) (*model.Employee, error) {
+func (s *EmployeeService) DeleteEmployee(ctx context.Context, sub string, empID string) (*model.Employee, error) {
 	cleanID := strings.TrimSpace(empID)
 	if cleanID == "" {
 		return nil, ErrInvalidEmpID
 	}
 
-	deletedEmp, err := s.repo.Delete(ctx, cleanID)
+	deletedEmp, err := s.repo.Delete(ctx, sub, cleanID)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, ErrEmployeeNotFound
@@ -106,11 +106,11 @@ func (s *EmployeeService) DeleteEmployee(ctx context.Context, empID string) (*mo
 }
 
 // SearchEmployees handles search validation and query logic across employees.
-func (s *EmployeeService) SearchEmployees(ctx context.Context, query string) ([]model.Employee, error) {
+func (s *EmployeeService) SearchEmployees(ctx context.Context, sub string, query string) ([]model.Employee, error) {
 	cleanQuery := strings.TrimSpace(query)
 	if cleanQuery == "" {
 		return nil, ErrSearchQueryRequired
 	}
 
-	return s.repo.Search(ctx, cleanQuery)
+	return s.repo.Search(ctx, sub, cleanQuery)
 }
