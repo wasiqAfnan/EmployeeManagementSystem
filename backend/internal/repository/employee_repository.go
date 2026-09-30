@@ -19,10 +19,16 @@ func NewEmployeeRepository(collection *mongo.Collection) *EmployeeRepository {
 	return &EmployeeRepository{collection: collection}
 }
 
-// GetAll fetches all employee records from MongoDB.
-func (r *EmployeeRepository) GetAll(ctx context.Context, sub string) ([]model.Employee, error) {
+// GetAll fetches employee records from MongoDB (all employees if admin, tenant-only if user).
+func (r *EmployeeRepository) GetAll(ctx context.Context, sub string, role string) ([]model.Employee, error) {
 	findOptions := options.Find().SetSort(bson.D{{Key: "empId", Value: 1}})
-	cursor, err := r.collection.Find(ctx, bson.M{"createdBy": sub}, findOptions)
+
+	filter := bson.M{}
+	if role != "admin" {
+		filter["createdBy"] = sub
+	}
+
+	cursor, err := r.collection.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -41,9 +47,14 @@ func (r *EmployeeRepository) GetAll(ctx context.Context, sub string) ([]model.Em
 }
 
 // GetByEmpID fetches a single employee record by empId from MongoDB.
-func (r *EmployeeRepository) GetByEmpID(ctx context.Context, sub string, empID string) (*model.Employee, error) {
+func (r *EmployeeRepository) GetByEmpID(ctx context.Context, sub string, role string, empID string) (*model.Employee, error) {
+	filter := bson.M{"empId": empID}
+	if role != "admin" {
+		filter["createdBy"] = sub
+	}
+
 	var employee model.Employee
-	err := r.collection.FindOne(ctx, bson.M{"empId": empID, "createdBy": sub}).Decode(&employee)
+	err := r.collection.FindOne(ctx, filter).Decode(&employee)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +72,7 @@ func (r *EmployeeRepository) Create(ctx context.Context, emp *model.Employee) (*
 		return nil, err
 	}
 
+	// Extract the inserted _id from the result
 	if oid, ok := result.InsertedID.(bson.ObjectID); ok {
 		emp.ID = oid
 	}
@@ -68,8 +80,12 @@ func (r *EmployeeRepository) Create(ctx context.Context, emp *model.Employee) (*
 }
 
 // Update updates an existing employee record by empId in MongoDB.
-func (r *EmployeeRepository) Update(ctx context.Context, sub string, empID string, emp model.Employee) (*model.Employee, error) {
-	filter := bson.M{"empId": empID, "createdBy": sub}
+func (r *EmployeeRepository) Update(ctx context.Context, sub string, role string, empID string, emp model.Employee) (*model.Employee, error) {
+	filter := bson.M{"empId": empID}
+	if role != "admin" {
+		filter["createdBy"] = sub
+	}
+
 	update := bson.M{
 		"$set": bson.M{
 			"fullName":   emp.FullName,
@@ -99,11 +115,16 @@ func (r *EmployeeRepository) Update(ctx context.Context, sub string, empID strin
 }
 
 // Delete removes an employee record by empId from MongoDB.
-func (r *EmployeeRepository) Delete(ctx context.Context, sub string, empID string) (*model.Employee, error) {
+func (r *EmployeeRepository) Delete(ctx context.Context, sub string, role string, empID string) (*model.Employee, error) {
+	filter := bson.M{"empId": empID}
+	if role != "admin" {
+		filter["createdBy"] = sub
+	}
+
 	var deletedEmp model.Employee
 	err := r.collection.FindOneAndDelete(
 		ctx,
-		bson.M{"empId": empID, "createdBy": sub},
+		filter,
 	).Decode(&deletedEmp)
 
 	if err != nil {
@@ -114,9 +135,8 @@ func (r *EmployeeRepository) Delete(ctx context.Context, sub string, empID strin
 }
 
 // Search queries employee records matching a regex across multiple fields.
-func (r *EmployeeRepository) Search(ctx context.Context, sub string, query string) ([]model.Employee, error) {
+func (r *EmployeeRepository) Search(ctx context.Context, sub string, role string, query string) ([]model.Employee, error) {
 	filter := bson.M{
-		"createdBy": sub,
 		"$or": []bson.M{
 			{"empId": bson.M{"$regex": query, "$options": "i"}},
 			{"fullName": bson.M{"$regex": query, "$options": "i"}},
@@ -125,8 +145,13 @@ func (r *EmployeeRepository) Search(ctx context.Context, sub string, query strin
 			{"department": bson.M{"$regex": query, "$options": "i"}},
 		},
 	}
+	if role != "admin" {
+		filter["createdBy"] = sub
+	}
 
+	// Sort by empId in ascending order
 	findOptions := options.Find().SetSort(bson.D{{Key: "empId", Value: 1}})
+
 	cursor, err := r.collection.Find(ctx, filter, findOptions)
 	if err != nil {
 		return nil, err

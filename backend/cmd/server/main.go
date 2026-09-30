@@ -29,13 +29,15 @@ func main() {
 	// Get the employees collection directly
 	collection := client.Database(cfg.DatabaseName).Collection("employees")
 
+	// Get the users collection & repo
+	userCollection := client.Database(cfg.DatabaseName).Collection("users")
+	userRepo := repository.NewUserRepository(userCollection)
+	userService := service.NewUserService(userRepo)
+
 	// Create repository, service, and handler for Employee
 	employeeRepo := repository.NewEmployeeRepository(collection)
-	employeeService := service.NewEmployeeService(employeeRepo)
+	employeeService := service.NewEmployeeService(employeeRepo, userRepo)
 	employeeHandler := handler.NewEmployeeHandler(employeeService)
-
-	// Get the users collection
-	userCollection := client.Database(cfg.DatabaseName).Collection("users")
 
 	// Create a new ServeMux
 	mux := http.NewServeMux()
@@ -53,9 +55,6 @@ func main() {
 		jwtVerifier = v
 	}
 
-	// Create repository, service, and handler for User
-	userRepo := repository.NewUserRepository(userCollection)
-	userService := service.NewUserService(userRepo)
 	userHandler := handler.NewUserHandler(userService, jwtVerifier)
 
 	// Register User routes
@@ -66,7 +65,7 @@ func main() {
 	var finalHandler http.Handler = mux
 	finalHandler = middleware.CORS(finalHandler, cfg.FrontendURL)
 	if jwtVerifier != nil {
-		finalHandler = middleware.Auth(jwtVerifier)(finalHandler)
+		finalHandler = middleware.Auth(jwtVerifier, userRepo)(finalHandler)
 	}
 	finalHandler = middleware.Logging(finalHandler)
 
