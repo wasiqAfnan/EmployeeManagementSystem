@@ -36,16 +36,19 @@ func (s *EmployeeService) populateCreatorEmails(ctx context.Context, employees [
 		return employees
 	}
 
+	// Get all users from the userRepo
 	users, err := s.userRepo.GetAll(ctx)
 	if err != nil || len(users) == 0 {
 		return employees
 	}
 
+	// Create a map of sub to email
 	userMap := make(map[string]string)
 	for _, u := range users {
 		userMap[u.Sub] = u.Email
 	}
 
+	// Populate the createdByEmail field for each employee
 	for i := range employees {
 		if email, found := userMap[employees[i].CreatedBy]; found {
 			employees[i].CreatedByEmail = email

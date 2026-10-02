@@ -6,15 +6,19 @@ import (
 	"strings"
 
 	"EMS/internal/cognito"
+	"EMS/internal/repository"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type contextKey string
 
-const UserContextKey = contextKey("userSub")
+const (
+	UserContextKey     = contextKey("userSub")
+	UserRoleContextKey = contextKey("userRole")
+)
 
-func Auth(verifier *cognito.JWTVerifier) func(http.Handler) http.Handler {
+func Auth(verifier *cognito.JWTVerifier, userRepo *repository.UserRepository) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.Method == http.MethodOptions || r.URL.Path == "/api/" {
@@ -49,8 +53,18 @@ func Auth(verifier *cognito.JWTVerifier) func(http.Handler) http.Handler {
 				return
 			}
 
-			// Add to context
+			// Lookup user role in MongoDB
+			role := "user"
+			if userRepo != nil {
+				user, err := userRepo.FindBySub(r.Context(), sub)
+				if err == nil && user != nil && user.Role != "" {
+					role = user.Role
+				}
+			}
+
+			// Add sub and role to context
 			ctx := context.WithValue(r.Context(), UserContextKey, sub)
+			ctx = context.WithValue(ctx, UserRoleContextKey, role)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
